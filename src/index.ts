@@ -6,7 +6,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import express, { type Request, type Response } from 'express'
-import { getAccessToken, handleUnauthorized } from './auth.js'
+import { getAccessToken, handleUnauthorized } from './auth'
 
 const BASE_URL = process.env.MYCASH_BASE_URL ?? 'https://mycash-lime.vercel.app'
 const MCP_SECRET = process.env.MCP_SECRET ?? ''
