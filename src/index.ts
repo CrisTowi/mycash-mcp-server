@@ -300,20 +300,13 @@ async function runHttp() {
   const app = express()
   app.use(express.json())
 
-  app.post('/mcp', async (req: Request, res: Response) => {
-    // Validate secret if configured
-    if (MCP_SECRET) {
-      const authHeader = req.headers.authorization ?? ''
-      if (authHeader !== `Bearer ${MCP_SECRET}`) {
-        res.status(401).json({ error: 'Unauthorized' })
-        return
-      }
-    }
-
+  // Handle both GET (SSE stream) and POST (JSON-RPC) for MCP
+  app.all('/mcp', async (req: Request, res: Response) => {
     const server = createServer()
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
     await server.connect(transport)
     await transport.handleRequest(req, res, req.body)
+    res.on('finish', () => { server.close().catch(() => {}) })
   })
 
   app.get('/health', (_req: Request, res: Response) => {
