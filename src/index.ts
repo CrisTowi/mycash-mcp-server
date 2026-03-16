@@ -236,6 +236,139 @@ function createServer(): Server {
           required: ['id'],
         },
       },
+      {
+        name: 'delete_portfolio_asset',
+        description: 'Delete a portfolio asset.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the asset to delete' },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'update_transaction',
+        description: 'Update an existing budget transaction.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the transaction' },
+            amount: { type: 'number' },
+            transaction_date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+            note: { type: 'string' },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'delete_transaction',
+        description: 'Delete a budget transaction.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the transaction' },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'add_budget_category',
+        description: 'Add a new budget category.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Category name' },
+            type: { type: 'string', enum: ['income', 'expense'], description: 'Category type' },
+            group_name: { type: 'string', description: 'Group this category belongs to' },
+            sort_order: { type: 'number', description: 'Display order (optional)' },
+          },
+          required: ['name', 'type', 'group_name'],
+        },
+      },
+      {
+        name: 'update_budget_category',
+        description: 'Rename or move a budget category to a different group.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the category' },
+            name: { type: 'string' },
+            group_name: { type: 'string' },
+            sort_order: { type: 'number' },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'delete_budget_category',
+        description: 'Delete a budget category.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the category' },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'settle_loan',
+        description: 'Mark a loan as fully settled.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the loan' },
+          },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'create_split_group',
+        description: 'Create a new shared expense group with members and their split ratios. Ratios must sum to 1.0. Mark yourself with is_me: true.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Group name' },
+            members: {
+              type: 'array',
+              description: 'At least 2 members. Ratios must sum to 1.0.',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  is_me: { type: 'boolean' },
+                  ratio: { type: 'number' },
+                },
+                required: ['name', 'is_me', 'ratio'],
+              },
+            },
+          },
+          required: ['name', 'members'],
+        },
+      },
+      {
+        name: 'rename_split_group',
+        description: 'Rename a shared expense group.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the group' },
+            name: { type: 'string', description: 'New name for the group' },
+          },
+          required: ['id', 'name'],
+        },
+      },
+      {
+        name: 'delete_split_group',
+        description: 'Delete a shared expense group and all its expenses.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'UUID of the group' },
+          },
+          required: ['id'],
+        },
+      },
     ],
   }))
 
@@ -300,6 +433,42 @@ function createServer(): Server {
           result = await callApi('/api/portfolio/assets', { method: 'PUT', body: JSON.stringify({ id, ...updateFields }) })
           break
         }
+        case 'delete_portfolio_asset':
+          result = await callApi(`/api/portfolio/assets/${toolArgs.id as string}`, { method: 'DELETE' })
+          break
+        case 'update_transaction': {
+          const { id, ...updateFields } = toolArgs
+          result = await callApi(`/api/budget/transactions/${id as string}`, { method: 'PUT', body: JSON.stringify(updateFields) })
+          break
+        }
+        case 'delete_transaction':
+          result = await callApi(`/api/budget/transactions/${toolArgs.id as string}`, { method: 'DELETE' })
+          break
+        case 'add_budget_category':
+          result = await callApi('/api/budget/categories', { method: 'POST', body: JSON.stringify(toolArgs) })
+          break
+        case 'update_budget_category': {
+          const { id, ...updateFields } = toolArgs
+          result = await callApi(`/api/budget/categories/${id as string}`, { method: 'PUT', body: JSON.stringify(updateFields) })
+          break
+        }
+        case 'delete_budget_category':
+          result = await callApi(`/api/budget/categories/${toolArgs.id as string}`, { method: 'DELETE' })
+          break
+        case 'settle_loan':
+          result = await callApi(`/api/loans/${toolArgs.id as string}/settle`, { method: 'PUT' })
+          break
+        case 'create_split_group':
+          result = await callApi('/api/splits/groups', { method: 'POST', body: JSON.stringify(toolArgs) })
+          break
+        case 'rename_split_group': {
+          const { id, name } = toolArgs
+          result = await callApi(`/api/splits/groups/${id as string}`, { method: 'PUT', body: JSON.stringify({ name }) })
+          break
+        }
+        case 'delete_split_group':
+          result = await callApi(`/api/splits/groups/${toolArgs.id as string}`, { method: 'DELETE' })
+          break
         default:
           throw new Error(`Unknown tool: ${name}`)
       }
