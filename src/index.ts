@@ -303,22 +303,47 @@ async function runHttp() {
 
   const baseUrl = process.env.RENDER_EXTERNAL_URL ?? `http://localhost:${process.env.PORT ?? '3001'}`
 
-  // OAuth discovery endpoint — required by MCP clients that use OAuth
+  // OAuth discovery endpoint
   app.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
     res.json({
       issuer: baseUrl,
+      authorization_endpoint: `${baseUrl}/authorize`,
       token_endpoint: `${baseUrl}/token`,
-      grant_types_supported: ['client_credentials'],
-      token_endpoint_auth_methods_supported: ['client_secret_post'],
+      grant_types_supported: ['authorization_code', 'client_credentials'],
+      response_types_supported: ['code'],
+      code_challenge_methods_supported: ['S256'],
+      token_endpoint_auth_methods_supported: ['client_secret_post', 'none'],
     })
   })
 
-  // Token endpoint — validates client_id + client_secret, returns the secret as the token
+  // Authorization endpoint — auto-approves and redirects back with a code
+  app.get('/authorize', (req: Request, res: Response) => {
+    const redirectUri = req.query.redirect_uri as string | undefined
+    const state = req.query.state as string | undefined
+
+    if (!redirectUri) {
+      res.status(400).send('Missing redirect_uri')
+      return
+    }
+
+    const code = MCP_SECRET ?? 'no-secret'
+    const redirect = new URL(redirectUri)
+    redirect.searchParams.set('code', code)
+    if (state) redirect.searchParams.set('state', state)
+
+    res.redirect(redirect.toString())
+  })
+
+  // Token endpoint — exchanges code or client_secret for an access token
   app.post('/token', (req: Request, res: Response) => {
-    const clientId = req.body.client_id as string | undefined
+    const grantType = req.body.grant_type as string | undefined
+    const code = req.body.code as string | undefined
     const clientSecret = req.body.client_secret as string | undefined
 
-    if (!MCP_SECRET || !clientId || clientSecret !== MCP_SECRET) {
+    const isValidCode = grantType === 'authorization_code' && code === MCP_SECRET
+    const isValidClientCreds = grantType === 'client_credentials' && clientSecret === MCP_SECRET
+
+    if (!MCP_SECRET || (!isValidCode && !isValidClientCreds)) {
       res.status(401).json({ error: 'invalid_client' })
       return
     }
