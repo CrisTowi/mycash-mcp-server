@@ -299,9 +299,48 @@ function createServer(): Server {
 async function runHttp() {
   const app = express()
   app.use(express.json())
+  app.use(express.urlencoded({ extended: true }))
 
-  // Handle both GET (SSE stream) and POST (JSON-RPC) for MCP
-  app.all('/mcp', async (req: Request, res: Response) => {
+  const baseUrl = process.env.RENDER_EXTERNAL_URL ?? `http://localhost:${process.env.PORT ?? '3001'}`
+
+  // OAuth discovery endpoint — required by MCP clients that use OAuth
+  app.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
+    res.json({
+      issuer: baseUrl,
+      token_endpoint: `${baseUrl}/token`,
+      grant_types_supported: ['client_credentials'],
+      token_endpoint_auth_methods_supported: ['client_secret_post'],
+    })
+  })
+
+  // Token endpoint — validates client_id + client_secret, returns the secret as the token
+  app.post('/token', (req: Request, res: Response) => {
+    const clientId = req.body.client_id as string | undefined
+    const clientSecret = req.body.client_secret as string | undefined
+
+    if (!MCP_SECRET || !clientId || clientSecret !== MCP_SECRET) {
+      res.status(401).json({ error: 'invalid_client' })
+      return
+    }
+
+    res.json({
+      access_token: MCP_SECRET,
+      token_type: 'Bearer',
+      expires_in: 3600,
+    })
+  })
+
+  // MCP endpoint — requires valid Bearer token when MCP_SECRET is set
+  app.all('/mcp', (req: Request, res: Response, next: express.NextFunction) => {
+    if (MCP_SECRET) {
+      const authHeader = req.headers.authorization ?? ''
+      if (authHeader !== `Bearer ${MCP_SECRET}`) {
+        res.status(401).json({ error: 'Unauthorized' })
+        return
+      }
+    }
+    next()
+  }, async (req: Request, res: Response) => {
     const server = createServer()
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
     await server.connect(transport)
