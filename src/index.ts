@@ -164,6 +164,18 @@ function createServer(): Server {
         },
       },
       {
+        name: 'settle_split',
+        description: 'Mark a member\'s share of an expense as settled (paid back).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            expense_id: { type: 'string', description: 'UUID of the expense' },
+            member_name: { type: 'string', description: 'Name of the member whose share is being settled' },
+          },
+          required: ['expense_id', 'member_name'],
+        },
+      },
+      {
         name: 'add_split_expense',
         description: 'Add an expense to a split group. Splits are calculated automatically based on member ratios.',
         inputSchema: {
@@ -267,6 +279,12 @@ function createServer(): Server {
           break
         case 'get_split_group':
           result = await callApi(`/api/splits/groups/${toolArgs.group_id as string}`)
+          break
+        case 'settle_split':
+          result = await callApi(`/api/splits/expenses/${toolArgs.expense_id as string}/settle`, {
+            method: 'PUT',
+            body: JSON.stringify({ member_name: toolArgs.member_name }),
+          })
           break
         case 'add_split_expense':
           result = await callApi('/api/splits/expenses', { method: 'POST', body: JSON.stringify(toolArgs) })
